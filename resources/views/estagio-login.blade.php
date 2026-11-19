@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório de Estágio | Acesso</title>
+<style>body{margin:0;background:#f2f7f4;font:16px system-ui,sans-serif;color:#193329;display:grid;place-items:center;min-height:100vh}main{background:white;border-radius:20px;padding:clamp(22px,5vw,42px);width:min(410px,calc(100% - 48px));box-shadow:0 12px 35px #1636291b}h1{font-size:1.5rem;margin:5px 0 8px}p{color:#586b61;line-height:1.5}label{font-weight:650;display:block;margin:18px 0 6px}input,button{box-sizing:border-box;width:100%;min-height:50px;border-radius:10px;font:inherit}input{padding:10px 13px;border:1px solid #aabdb3}input:focus{outline:3px solid #b7e2ca}button{margin-top:22px;background:#12633b;color:white;border:0;font-weight:750;cursor:pointer}.error{background:#fff0ef;padding:12px;border-radius:8px;color:#9d1a15}</style></head>
+<body><main><div style="color:#12633b;font-weight:800">EEEP Monsenhor Luiz Ximenes Freire</div><h1>Seu relatório começa aqui</h1><p>Utilize seus dados cadastrados pela escola para continuar o relatório de onde parou.</p>
+@if($errors->any())<div class="error" role="alert">{{$errors->first()}}</div>@endif
+<form method="post" action="{{route('estagio.entrar')}}">@csrf
+<label for="cpf">CPF</label><input id="cpf" name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required value="{{old('cpf')}}">
+<label for="nascimento">Data de nascimento</label><input id="nascimento" type="date" name="nascimento" required>
+<button type="submit">Entrar no meu relatório</button></form><p style="font-size:.8rem">Os dados são utilizados exclusivamente para identificar seu cadastro escolar.</p><p><a href="{{route('admin.login')}}" style="color:#12633b">Acesso do professor</a></p></main></body></html>

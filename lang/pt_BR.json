@@ -1,0 +1,10 @@
+{
+    "Too Many Attempts.": "Muitas tentativas. Aguarde um minuto antes de tentar novamente.",
+    "Too Many Requests": "Muitas solicitações. Aguarde um minuto e tente novamente.",
+    "Page Expired": "Sua sessão expirou. Recarregue a página e entre novamente.",
+    "Forbidden": "Acesso não autorizado.",
+    "Not Found": "Página não encontrada.",
+    "Server Error": "Ocorreu um erro no servidor. Tente novamente em instantes.",
+    "Service Unavailable": "Sistema temporariamente indisponível.",
+    "Unauthorized": "Entre no sistema para continuar."
+}

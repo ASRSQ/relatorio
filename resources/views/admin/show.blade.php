@@ -1,0 +1,11 @@
+@extends('admin.layout')
+@section('content')
+<a href="{{route('admin.index')}}">← Voltar ao painel</a><h1>{{$aluno->nome}}</h1><p>{{$aluno->curso}} · {{$aluno->turma}} · {{$aluno->concedente}}</p><p>Situação: {{$relatorio?->situacao ?? 'Não iniciado'}}</p>
+@if($relatorio)
+@php($identificacao = $relatorio->identificacao())
+<section class="card"><h2>Identificação complementar</h2><p>Série: {{$identificacao['serie'] ?: 'Não informada'}}</p>@foreach(['empresa'=>'Empresa','escola'=>'Escola'] as $prefixo=>$titulo)<h3>{{$titulo}}</h3><p>{{$identificacao[$prefixo.'_endereco'] ?: 'Endereço não informado'}}, {{$identificacao[$prefixo.'_numero'] ?: 'número não informado'}} · {{$identificacao[$prefixo.'_bairro']}} · {{$identificacao[$prefixo.'_cidade']}}</p><p>Telefone: {{$identificacao[$prefixo.'_telefone'] ?: 'Não informado'}} · E-mail: {{$identificacao[$prefixo.'_email'] ?: 'Não informado'}}</p>@endforeach<p>Período: {{$aluno->inicio?->format('d/m/Y') ?: 'Não informado'}} a {{$aluno->termino?->format('d/m/Y') ?: 'Não informado'}}</p></section>
+<a class="btn" href="{{route('admin.pdf',$aluno)}}">Baixar PDF @unless($relatorio->concluido_em) do rascunho @endunless</a>
+@foreach(['introducao'=>'Introdução','atividades'=>'Atividades desenvolvidas','conclusao'=>'Conclusão','referencias'=>'Referências'] as $campo=>$titulo)<section class="card"><h2>{{$titulo}}</h2><div class="texto">{{$relatorio->$campo ?: 'Ainda não preenchido.'}}</div></section>@endforeach
+<p>Local: {{$relatorio->local}} · Data: {{$relatorio->data_relatorio?->format('d/m/Y')}}</p>
+@else<section class="card">O aluno ainda não iniciou o relatório.</section>@endif
+@endsection
