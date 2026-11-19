@@ -25,7 +25,8 @@ class AdminController extends Controller
             throw ValidationException::withMessages(['email' => 'Aguarde alguns minutos antes de tentar novamente.']);
         }
         RateLimiter::hit($key, 300);
-        if (! Auth::attempt([...$data, 'is_admin' => true])) {
+        if (! Auth::attempt([...$data, 'ativo' => true]) || (! Auth::user()->is_admin && ! Auth::user()->is_professor)) {
+            Auth::logout();
             throw ValidationException::withMessages(['email' => 'Credenciais inválidas.']);
         }
         RateLimiter::clear($key);
@@ -47,7 +48,10 @@ class AdminController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate(['busca' => 'nullable|string|max:100', 'status' => 'nullable|in:nao_iniciado,iniciado,preenchendo,concluido']);
-        $query = EstagioAluno::with('relatorio')->orderBy('nome');
+        $usuario = Auth::user();
+        $base = EstagioAluno::query()->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id')));
+        $query = (clone $base)->with('relatorio')->orderBy('nome');
+        if ($request->filled('turma_id')) $query->where('turma_id', $request->integer('turma_id'));
         if ($search = $data['busca'] ?? null) {
             $query->where(fn ($q) => $q->where('nome', 'like', "%$search%")->orWhere('turma', 'like', "%$search%"));
         }
@@ -66,13 +70,22 @@ class AdminController extends Controller
             }
         }
         $alunos = $query->paginate(20)->withQueryString();
-        $totais = ['Cadastrados' => EstagioAluno::count(), 'Iniciados' => EstagioAluno::whereHas('relatorio')->count(), 'Concluídos' => EstagioAluno::whereHas('relatorio', fn ($q) => $q->whereNotNull('concluido_em'))->count()];
+        $totais = [
+            'Alunos' => (clone $base)->count(),
+            'Não iniciados' => (clone $base)->whereDoesntHave('relatorio')->count(),
+            'Em preenchimento' => (clone $base)->whereHas('relatorio', fn ($q) => $q->whereNull('concluido_em'))->count(),
+            'Finalizados' => (clone $base)->whereHas('relatorio', fn ($q) => $q->whereNotNull('concluido_em'))->count(),
+            'Concedentes cadastradas' => \App\Models\Concedente::count(),
+            'Pendências' => \App\Models\SolicitacaoConcedente::where('situacao', 'pendente')->whereHas('aluno', fn ($q) => $q->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id'))))->count(),
+        ];
+        $turmas = $usuario->is_admin ? \App\Models\Turma::orderBy('nome')->get() : $usuario->turmas()->orderBy('nome')->get();
 
-        return view('admin.index', compact('alunos', 'totais'));
+        return view('admin.index', compact('alunos', 'totais', 'turmas'));
     }
 
     public function importar(Request $request, ImportarAlunos $importador)
     {
+        abort_unless(Auth::user()->is_admin, 403);
         $request->validate(['arquivo' => 'required|file|max:5120|mimes:csv,txt']);
         $count = $importador->importar($request->file('arquivo')->getRealPath());
 
@@ -81,6 +94,7 @@ class AdminController extends Controller
 
     public function show(EstagioAluno $aluno)
     {
+        abort_unless(Auth::user()->podeVerAluno($aluno), 403);
         $relatorio = $aluno->relatorio;
 
         return view('admin.show', compact('aluno', 'relatorio'));
@@ -88,9 +102,11 @@ class AdminController extends Controller
 
     public function pdf(EstagioAluno $aluno)
     {
+        abort_unless(Auth::user()->podeVerAluno($aluno), 403);
         $relatorio = $aluno->relatorio;
         abort_unless($relatorio, 404);
 
+        $relatorio->aplicarConcedente($aluno);
         $relatorio->validarConclusao($aluno);
 
         [$pdf] = app(RelatorioPdf::class)->gerar($aluno, $relatorio);

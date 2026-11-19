@@ -1,0 +1,6 @@
+@extends('admin.layout')
+@section('content')
+<h1>Concedentes</h1><section class="card"><form method="get"><label>Pesquisar por nome ou CPF/CNPJ<input name="busca" value="{{request('busca')}}"></label><button>Pesquisar</button></form><p>Confira os resultados antes de cadastrar uma empresa. O CPF/CNPJ é usado para evitar duplicidade.</p></section>
+<section class="card"><details><summary>Cadastrar concedente</summary><form method="post" action="{{route('admin.concedentes.salvar')}}">@csrf @include('gestao.empresa-campos',['empresa'=>null])<input type="hidden" name="ativa" value="1"><p><button>Cadastrar</button></p></form></details></section>
+@foreach($empresas as $empresa)<section class="card"><h2>{{$empresa->nome}} @unless($empresa->ativa)<small>Inativa</small>@endunless</h2><p>CPF/CNPJ: {{$empresa->documento ?: 'Não informado'}} · Alunos de suas turmas: {{$empresa->alunos->pluck('nome')->join(', ') ?: 'Nenhum'}}</p><details><summary>Editar concedente</summary><form method="post" action="{{route('admin.concedentes.salvar',$empresa)}}">@csrf @include('gestao.empresa-campos')<label>Situação<select name="ativa"><option value="1" @selected($empresa->ativa)>Ativa</option><option value="0" @selected(! $empresa->ativa)>Inativa</option></select></label><p><button>Salvar</button></p></form></details></section>@endforeach
+@endsection

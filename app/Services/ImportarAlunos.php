@@ -22,7 +22,7 @@ class ImportarAlunos
                 throw ValidationException::withMessages(['arquivo' => 'CSV vazio.']);
             }
             $header = array_map(fn ($v) => trim(preg_replace('/^\xEF\xBB\xBF/', '', $v ?? '')), $header);
-            $required = ['cpf', 'nascimento', 'nome', 'escola', 'curso', 'ano_letivo', 'concedente', 'inicio', 'termino', 'carga_horaria', 'orientador'];
+            $required = ['cpf', 'nascimento', 'nome', 'escola', 'curso', 'ano_letivo', 'inicio', 'termino', 'carga_horaria', 'orientador'];
             if (array_diff($required, $header) || count(array_unique($header)) !== count($header)) {
                 throw ValidationException::withMessages(['arquivo' => 'Cabeçalho inválido. Consulte as colunas no manual.']);
             }
@@ -69,13 +69,22 @@ class ImportarAlunos
                         }
                         $row[$field] = $date->format('Y-m-d');
                     }
-                    $rules = array_fill_keys(['nome', 'escola', 'curso', 'concedente', 'orientador'], 'required|string|max:255');
+                    $rules = array_fill_keys(['nome', 'escola', 'curso', 'orientador'], 'required|string|max:255');
+                    if (array_key_exists('concedente', $row) && $row['concedente'] !== '') $rules['concedente'] = 'string|max:255';
                     $rules += ['nascimento' => 'required|date|before:today', 'inicio' => 'nullable|date', 'termino' => 'nullable|date|after_or_equal:inicio', 'ano_letivo' => 'required|string|max:10', 'carga_horaria' => 'required|integer|min:1|max:65535', 'turma' => 'nullable|string|max:100'];
                     $validator = Validator::make($row, $rules);
                     if ($validator->fails()) {
                         $fail(implode(' ', $validator->errors()->all()));
                     }
-                    EstagioAluno::updateOrCreate(['cpf_hash' => hash_hmac('sha256', $cpf, config('app.key'))], $validator->validated());
+                    $dados = $validator->validated();
+                    if (! empty($dados['turma'])) {
+                        $turma = \App\Models\Turma::firstOrCreate(['nome'=>$dados['turma'], 'curso'=>$dados['curso'], 'ano_letivo'=>$dados['ano_letivo']]);
+                        $dados['turma_id'] = $turma->id;
+                    }
+                    $hash = hash_hmac('sha256', $cpf, config('app.key'));
+                    if (EstagioAluno::where('cpf_hash', $hash)->exists()) unset($dados['concedente']);
+                    elseif (! isset($dados['concedente'])) $dados['concedente'] = '';
+                    EstagioAluno::updateOrCreate(['cpf_hash' => $hash], $dados);
                     $count++;
                 }
                 if (! $count) {

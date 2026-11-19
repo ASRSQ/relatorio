@@ -13,7 +13,7 @@ class Professor
         if (! Auth::check()) {
             return redirect()->route('admin.login');
         }
-        abort_unless(Auth::user()->is_admin, 403);
+        abort_unless(Auth::user()->ativo && (Auth::user()->is_admin || Auth::user()->is_professor), 403);
 
         return $next($request);
     }

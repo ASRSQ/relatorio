@@ -69,6 +69,7 @@ class EstagioController extends Controller
     {
         $aluno = $this->aluno($request);
         $relatorio = $aluno->relatorio()->firstOrCreate([], ['local' => 'Santa Quitéria']);
+        $relatorio->aplicarConcedente($aluno);
 
         return view('estagio-editar', compact('aluno', 'relatorio'));
     }
@@ -92,11 +93,12 @@ class EstagioController extends Controller
             unset($dados['versao'], $dados['concluir'], $dados['inicio'], $dados['termino']);
             $relatorio->fill($dados);
             $aluno->fill($periodo);
+            $aluno->save();
             if ($concluir) {
+                $relatorio->aplicarConcedente($aluno, true);
                 $relatorio->validarConclusao($aluno);
                 app(RelatorioPdf::class)->gerar($aluno, $relatorio);
             }
-            $aluno->save();
             $relatorio->concluido_em = $concluir ? now() : null;
             $relatorio->versao++;
             $relatorio->save();
@@ -117,6 +119,7 @@ class EstagioController extends Controller
         if (! $relatorio || ! trim($relatorio->introducao ?? '') || ! trim($relatorio->atividades ?? '') || ! trim($relatorio->conclusao ?? '')) {
             return redirect()->route('estagio.editar')->withErrors(['pdf' => 'Preencha e salve as três seções antes de gerar o PDF.']);
         }
+        $relatorio->aplicarConcedente($aluno);
         $relatorio->validarConclusao($aluno);
 
         [$pdf] = app(RelatorioPdf::class)->gerar($aluno, $relatorio);
@@ -128,6 +131,7 @@ class EstagioController extends Controller
     {
         $aluno = $this->aluno($request);
         $relatorio = $aluno->relatorio()->firstOrCreate([], ['local' => 'Santa Quitéria']);
+        $relatorio->aplicarConcedente($aluno);
         [$pdf, $erros] = app(RelatorioPdf::class)->gerar($aluno, $relatorio, false);
 
         return response()->view('estagio-preview', ['pdfBase64' => base64_encode($pdf->output()), 'erros' => $erros]);

@@ -13,6 +13,8 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    protected $attributes = ['ativo' => true, 'is_admin' => false, 'is_professor' => false];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -43,8 +45,17 @@ class User extends Authenticatable
     {
         return [
             'is_admin' => 'boolean',
+            'ativo' => 'boolean',
+            'is_professor' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function turmas() { return $this->belongsToMany(Turma::class, 'professor_turma'); }
+
+    public function podeVerAluno(EstagioAluno $aluno): bool
+    {
+        return $this->ativo && ($this->is_admin || ($aluno->turma_id && $this->turmas()->where('turmas.id', $aluno->turma_id)->exists()));
     }
 }

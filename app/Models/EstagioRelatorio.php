@@ -17,7 +17,22 @@ class EstagioRelatorio extends Model
 
     protected $attributes = ['versao' => 0];
 
-    protected $casts = ['data_relatorio' => 'date', 'concluido_em' => 'datetime', 'versao' => 'integer'];
+    protected $casts = ['data_relatorio' => 'date', 'concluido_em' => 'datetime', 'versao' => 'integer', 'concedente_snapshot' => 'array'];
+
+    public function aplicarConcedente(EstagioAluno $aluno, bool $finalizando = false): void
+    {
+        if ($this->concluido_em && ! $finalizando) {
+            $dados = $this->concedente_snapshot;
+        } else {
+            $empresa = $aluno->empresa;
+            $dados = $empresa ? $empresa->only(['nome', 'endereco', 'numero', 'bairro', 'cidade', 'estado', 'telefone', 'email']) : null;
+            if ($finalizando) $this->concedente_snapshot = $dados;
+        }
+        if (! $dados) return;
+        $aluno->concedente = $dados['nome'];
+        foreach (['endereco', 'numero', 'bairro', 'telefone', 'email'] as $campo) $this->{'empresa_'.$campo} = $dados[$campo] ?? null;
+        $this->empresa_cidade = trim(($dados['cidade'] ?? '').(! empty($dados['estado']) ? ' - '.$dados['estado'] : '')) ?: null;
+    }
 
     public function identificacao(): array
     {

@@ -19,4 +19,8 @@ class EstagioAluno extends Model
     {
         return $this->hasOne(EstagioRelatorio::class, 'aluno_id');
     }
+
+    public function turmaVinculada() { return $this->belongsTo(Turma::class, 'turma_id'); }
+    public function empresa() { return $this->belongsTo(Concedente::class, 'concedente_id'); }
+    public function solicitacoes() { return $this->hasMany(SolicitacaoConcedente::class, 'aluno_id'); }
 }
