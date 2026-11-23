@@ -10,6 +10,23 @@ use Illuminate\Validation\ValidationException;
 
 class ImportarAlunos
 {
+    private function normalizarEscola(string $nome): string
+    {
+        $nome = mb_strtolower($nome, 'UTF-8');
+        // Apenas variantes acentuadas latinas comuns; n?o usa compara??o aproximada.
+        $nome = strtr($nome, [
+            'á'=>'a', 'à'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a',
+            'é'=>'e', 'è'=>'e', 'ê'=>'e', 'ë'=>'e',
+            'í'=>'i', 'ì'=>'i', 'î'=>'i', 'ï'=>'i',
+            'ó'=>'o', 'ò'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o',
+            'ú'=>'u', 'ù'=>'u', 'û'=>'u', 'ü'=>'u', 'ç'=>'c', 'ñ'=>'n',
+        ]);
+        $nome = preg_replace('/\p{Mn}+/u', '', $nome);
+        $nome = preg_replace('/[\p{P}\p{Z}\s]+/u', ' ', $nome);
+
+        return trim($nome);
+    }
+
     public function importar(string $path, ?array $opcoes = null, ?\App\Models\User $usuario = null): int|array
     {
         $fp = fopen($path, 'r');
@@ -97,7 +114,12 @@ class ImportarAlunos
                     }
                     $dados = $validator->validated();
                     if ($turmaSelecionada) {
-                        foreach (['escola', 'curso', 'ano_letivo'] as $campo) {
+                        $escolaTurma = $turmaSelecionada->escola;
+                        if (! $escolaTurma || $this->normalizarEscola($dados['escola']) !== $this->normalizarEscola($escolaTurma)) {
+                            $cadastrada = $escolaTurma ?: 'n?o informada';
+                            $fail("Escola cadastrada na turma: {$cadastrada}. Escola identificada no CSV: {$dados['escola']}.");
+                        }
+                        foreach (['curso', 'ano_letivo'] as $campo) {
                             if ($turmaSelecionada->$campo && mb_strtolower(trim($dados[$campo])) !== mb_strtolower(trim($turmaSelecionada->$campo))) $fail("O campo $campo não corresponde à turma selecionada.");
                         }
                         $dados['turma'] = $turmaSelecionada->nome;
@@ -110,7 +132,7 @@ class ImportarAlunos
                     $aluno = EstagioAluno::where('cpf_hash', $hash)->first();
                     if ($aluno) {
                         if ($usuario && ! $usuario->is_admin && ! $usuario->podeVerAluno($aluno)) $fail('Um aluno já cadastrado não pertence às suas turmas.');
-                        unset($dados['concedente']);
+                        unset($dados['concedente'], $dados['escola']);
                         $aluno->fill($dados)->save(); $atualizados++;
                     } else {
                         $dados['concedente'] ??= '';

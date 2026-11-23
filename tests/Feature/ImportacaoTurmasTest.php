@@ -47,6 +47,43 @@ class ImportacaoTurmasTest extends TestCase
         $this->assertSame(0, Turma::count());
         $this->assertSame(0, EstagioAluno::count());
     }
+    public function test_escola_normalizada_sem_alterar_nomes_originais(): void
+    {
+        $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
+        $turma = Turma::create(['nome'=>'A', 'escola'=>'EEEP Monsenhor Luís Ximenes Freire', 'curso'=>'Curso', 'ano_letivo'=>'2026']);
+        $linha = str_replace('Escola', ' EEEP   MONSENHOR LUIS XIMENES FREIRE ', $this->row());
+        $this->actingAs($admin)->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>$this->csv($linha)])->assertSessionHasNoErrors();
+        $aluno = EstagioAluno::firstOrFail();
+        $this->assertSame('EEEP   MONSENHOR LUIS XIMENES FREIRE', $aluno->escola);
+        $linha = str_replace('Escola', 'EEEP Monsenhor Luís, Ximenes Freire', $this->row());
+        $this->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>$this->csv($linha)])->assertSessionHasNoErrors();
+        $this->assertSame('EEEP   MONSENHOR LUIS XIMENES FREIRE', $aluno->fresh()->escola);
+        $this->assertSame('EEEP Monsenhor Luís Ximenes Freire', $turma->fresh()->escola);
+    }
+
+    public function test_escola_diferente_informa_dados_e_reverte_alteracoes(): void
+    {
+        $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
+        $turma = Turma::create(['nome'=>'A', 'escola'=>'Escola Central', 'curso'=>'Curso', 'ano_letivo'=>'2026']);
+        $primeira = str_replace('Escola', 'Escola Central', $this->row());
+        $segunda = str_replace('Escola', 'Escola Central Norte', $this->row('11144477735'));
+        $resposta = $this->actingAs($admin)->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>$this->csv($primeira.$segunda)]);
+        $resposta->assertSessionHasErrors('arquivo');
+        $mensagem = session('errors')->first('arquivo');
+        $this->assertStringContainsString('Linha 3', $mensagem);
+        $this->assertStringContainsString('Escola cadastrada na turma: Escola Central', $mensagem);
+        $this->assertStringContainsString('Escola identificada no CSV: Escola Central Norte', $mensagem);
+        $this->assertSame(0, EstagioAluno::count());
+    }
+
+    public function test_turma_sem_escola_nao_aceita_importacao(): void
+    {
+        $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
+        $turma = Turma::create(['nome'=>'A', 'curso'=>'Curso', 'ano_letivo'=>'2026']);
+        $this->actingAs($admin)->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>$this->csv($this->row())])->assertSessionHasErrors('arquivo');
+        $this->assertSame(0, EstagioAluno::count());
+    }
+
     public function test_professor_nao_pode_importar_para_turma_de_outro(): void
     {
         $professor = User::factory()->create(['is_professor'=>true, 'ativo'=>true]);
