@@ -66,13 +66,24 @@ class GestaoController extends Controller
     }
     public function turmas()
     {
-        $usuario = Auth::user(); $turmas = $usuario->is_admin ? Turma::with('professores')->get() : $usuario->turmas()->with('professores')->get();
-        return view('gestao.turmas', compact('turmas'));
+        $usuario = Auth::user(); $turmas = $usuario->is_admin ? Turma::with('professores')->withCount('alunos')->get() : $usuario->turmas()->with('professores')->withCount('alunos')->get();
+        $professores = $usuario->is_admin ? User::where('is_professor', true)->where('ativo', true)->orderBy('name')->get() : collect();
+        return view('gestao.turmas', compact('turmas', 'professores'));
     }
     public function salvarTurma(Request $request, ?Turma $turma = null)
     {
-        $this->admin(); $dados = $request->validate(['nome'=>'required|string|max:255','curso'=>'required|string|max:255','serie'=>'nullable|string|max:255','ano_letivo'=>'required|string|max:10','turno'=>'nullable|string|max:255','ativa'=>'required|boolean']);
+        $this->admin();
+        $dados = $request->validate(['nome'=>'required|string|max:100','escola'=>'nullable|string|max:255','curso'=>'required|string|max:255','serie'=>'nullable|string|max:255','ano_letivo'=>'required|string|max:10','turno'=>'nullable|string|max:255','ativa'=>'required|boolean']);
+        $dados['identidade_hash'] = ! empty($dados['escola']) && ! empty($dados['serie']) ? Turma::chaveIdentidade($dados) : null;
+        if ($dados['identidade_hash'] && Turma::where('identidade_hash', $dados['identidade_hash'])->when($turma, fn ($q) => $q->where('id', '!=', $turma->id))->exists()) throw ValidationException::withMessages(['nome'=>'J? existe uma turma com esta identifica??o.']);
         ($turma ?? new Turma())->fill($dados)->save(); return back()->with('ok', 'Turma salva.');
+    }
+    public function vincularProfessor(Request $request, Turma $turma)
+    {
+        $this->admin();
+        $dados = $request->validate(['professor_id' => ['required', Rule::exists('users', 'id')->where('is_professor', true)->where('ativo', true)]]);
+        $turma->professores()->syncWithoutDetaching([$dados['professor_id']]);
+        return back()->with('ok', 'Professor vinculado ? turma.');
     }
     public function empresas(Request $request)
     {

@@ -85,11 +85,14 @@ class AdminController extends Controller
 
     public function importar(Request $request, ImportarAlunos $importador)
     {
-        abort_unless(Auth::user()->is_admin, 403);
-        $request->validate(['arquivo' => 'required|file|max:5120|mimes:csv,txt']);
-        $count = $importador->importar($request->file('arquivo')->getRealPath());
-
-        return back()->with('ok', "$count cadastros importados/atualizados. Relatórios preservados.");
+        $dados = $request->validate([
+            'arquivo' => 'required|file|max:5120|mimes:csv,txt', 'turma_id' => 'nullable|integer|exists:turmas,id',
+            'nome' => 'required_without:turma_id|nullable|string|max:100', 'escola' => 'required_without:turma_id|nullable|string|max:255',
+            'curso' => 'required_without:turma_id|nullable|string|max:255', 'serie' => 'required_without:turma_id|nullable|string|max:255',
+            'ano_letivo' => 'required_without:turma_id|nullable|string|max:10',
+        ]);
+        $resultado = $importador->importar($request->file('arquivo')->getRealPath(), $dados, Auth::user());
+        return back()->with('importacao', $resultado);
     }
 
     public function show(EstagioAluno $aluno)

@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 class ImportarEstagiarios extends Command
 {
-    protected $signature = 'estagio:importar {arquivo : CSV UTF-8 separado por ponto e vírgula}';
+    protected $signature = 'estagio:importar {arquivo : CSV UTF-8} {--turma= : ID da turma existente}';
 
     protected $description = 'Importar alunos preservando os relatórios existentes';
 
@@ -20,8 +20,13 @@ class ImportarEstagiarios extends Command
 
             return self::FAILURE;
         }
+        if (! $this->option('turma') || ! \App\Models\Turma::whereKey($this->option('turma'))->exists()) {
+            $this->error('Informe uma turma existente com --turma=ID.');
+            return self::FAILURE;
+        }
         try {
-            $this->info('Importados/atualizados: '.$importador->importar($path));
+            $resultado = $importador->importar($path, ['turma_id' => $this->option('turma')]);
+            $this->info('Turma: '.$resultado['turma'].'; importados: '.$resultado['importados'].'; atualizados: '.$resultado['atualizados'].'; ignorados: '.$resultado['ignorados'].'. Professores: '.(implode(', ', $resultado['professores']) ?: 'pendente')); 
         } catch (ValidationException $e) {
             foreach ($e->errors() as $errors) {
                 foreach ($errors as $error) {

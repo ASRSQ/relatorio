@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class ImportarAlunos
 {
-    public function importar(string $path): int
+    public function importar(string $path, ?array $opcoes = null, ?\App\Models\User $usuario = null): int|array
     {
         $fp = fopen($path, 'r');
         if (! $fp) {
@@ -27,7 +27,28 @@ class ImportarAlunos
                 throw ValidationException::withMessages(['arquivo' => 'Cabeçalho inválido. Consulte as colunas no manual.']);
             }
 
-            return DB::transaction(function () use ($fp, $header) {
+            return DB::transaction(function () use ($fp, $header, $opcoes, $usuario) {
+                $turmaSelecionada = null; $criada = false; $importados = 0; $atualizados = 0; $ignorados = 0;
+                if ($opcoes !== null) {
+                    if (! empty($opcoes['turma_id'])) {
+                        $turmaSelecionada = \App\Models\Turma::findOrFail($opcoes['turma_id']);
+                        if ($usuario && ! $usuario->is_admin && ! $usuario->turmas()->where('turmas.id', $turmaSelecionada->id)->exists()) abort(403);
+                    } else {
+                        $identidade = array_intersect_key($opcoes, array_flip(['escola', 'curso', 'serie', 'ano_letivo', 'nome']));
+                        $chave = \App\Models\Turma::chaveIdentidade($identidade);
+                        $turmaSelecionada = \App\Models\Turma::where('identidade_hash', $chave)->first();
+                        if (! $turmaSelecionada) {
+                            $turmaSelecionada = \App\Models\Turma::where($identidade)->first();
+                            if ($turmaSelecionada) { $turmaSelecionada->identidade_hash = $chave; $turmaSelecionada->save(); }
+                            else $turmaSelecionada = \App\Models\Turma::firstOrCreate(['identidade_hash' => $chave], $identidade);
+                        }
+                        $criada = $turmaSelecionada->wasRecentlyCreated;
+                        if ($usuario && ! $usuario->is_admin) {
+                            if (! $criada && ! $usuario->turmas()->where('turmas.id', $turmaSelecionada->id)->exists()) abort(403);
+                            if ($criada) $turmaSelecionada->professores()->syncWithoutDetaching([$usuario->id]);
+                        }
+                    }
+                }
                 $count = 0;
                 $line = 1;
                 $seen = [];
@@ -53,9 +74,7 @@ class ImportarAlunos
                     if (! EstagioController::cpfValido($cpf)) {
                         $fail('CPF inválido.');
                     }
-                    if (isset($seen[$cpf])) {
-                        $fail('CPF repetido no arquivo.');
-                    }
+                    if (isset($seen[$cpf])) { $ignorados++; continue; }
                     $seen[$cpf] = true;
                     foreach (['nascimento', 'inicio', 'termino'] as $field) {
                         if ($row[$field] === '' && $field !== 'nascimento') {
@@ -77,21 +96,34 @@ class ImportarAlunos
                         $fail(implode(' ', $validator->errors()->all()));
                     }
                     $dados = $validator->validated();
-                    if (! empty($dados['turma'])) {
+                    if ($turmaSelecionada) {
+                        foreach (['escola', 'curso', 'ano_letivo'] as $campo) {
+                            if ($turmaSelecionada->$campo && mb_strtolower(trim($dados[$campo])) !== mb_strtolower(trim($turmaSelecionada->$campo))) $fail("O campo $campo n?o corresponde ? turma selecionada.");
+                        }
+                        $dados['turma'] = $turmaSelecionada->nome;
+                        $dados['turma_id'] = $turmaSelecionada->id;
+                    } elseif (! empty($dados['turma'])) {
                         $turma = \App\Models\Turma::firstOrCreate(['nome'=>$dados['turma'], 'curso'=>$dados['curso'], 'ano_letivo'=>$dados['ano_letivo']]);
                         $dados['turma_id'] = $turma->id;
                     }
                     $hash = hash_hmac('sha256', $cpf, config('app.key'));
-                    if (EstagioAluno::where('cpf_hash', $hash)->exists()) unset($dados['concedente']);
-                    elseif (! isset($dados['concedente'])) $dados['concedente'] = '';
-                    EstagioAluno::updateOrCreate(['cpf_hash' => $hash], $dados);
+                    $aluno = EstagioAluno::where('cpf_hash', $hash)->first();
+                    if ($aluno) {
+                        if ($usuario && ! $usuario->is_admin && ! $usuario->podeVerAluno($aluno)) $fail('Um aluno j? cadastrado n?o pertence ?s suas turmas.');
+                        unset($dados['concedente']);
+                        $aluno->fill($dados)->save(); $atualizados++;
+                    } else {
+                        $dados['concedente'] ??= '';
+                        EstagioAluno::create(['cpf_hash' => $hash] + $dados); $importados++;
+                    }
                     $count++;
                 }
                 if (! $count) {
                     throw ValidationException::withMessages(['arquivo' => 'O CSV não contém alunos.']);
                 }
 
-                return $count;
+                if ($opcoes === null) return $count;
+                return ['turma' => $turmaSelecionada->nome, 'criada' => $criada, 'importados' => $importados, 'atualizados' => $atualizados, 'ignorados' => $ignorados, 'professores' => $turmaSelecionada->professores()->pluck('name')->all()];
             });
         } finally {
             fclose($fp);

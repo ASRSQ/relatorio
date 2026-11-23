@@ -1,0 +1,46 @@
+<?php
+namespace Tests\Feature;
+
+use App\Models\{Turma, User, EstagioAluno};
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Tests\TestCase;
+
+class ImportacaoTurmasTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function csv(string $rows): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent('alunos.csv', "cpf;nascimento;nome;escola;curso;ano_letivo;inicio;termino;carga_horaria;orientador\n".$rows);
+    }
+    private function row(string $cpf = '52998224725'): string
+    {
+        return "$cpf;10/02/2007;Aluno;Escola;Curso;2026;;;300;Professor\n";
+    }
+    public function test_importacao_cria_reutiliza_e_vincula_professor(): void
+    {
+        $professor = User::factory()->create(['is_professor'=>true, 'ativo'=>true]);
+        $dados = ['nome'=>'3 A', 'escola'=>'Escola', 'curso'=>'Curso', 'serie'=>'3', 'ano_letivo'=>'2026'];
+        $this->actingAs($professor)->post(route('admin.importar'), $dados + ['arquivo'=>$this->csv($this->row())])->assertSessionHasNoErrors()->assertSessionHas('importacao.importados', 1);
+        $turma = Turma::firstOrFail();
+        $this->assertTrue($turma->professores->contains($professor));
+        $this->assertSame($turma->id, EstagioAluno::firstOrFail()->turma_id);
+        $this->actingAs($professor)->post(route('admin.importar'), $dados + ['arquivo'=>$this->csv($this->row().$this->row())])->assertSessionHasNoErrors()->assertSessionHas('importacao.atualizados', 1)->assertSessionHas('importacao.ignorados', 1);
+        $this->assertSame(1, Turma::count());
+    }
+    public function test_erro_reverte_turma_e_alunos(): void
+    {
+        $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
+        $dados = ['nome'=>'3 A', 'escola'=>'Escola', 'curso'=>'Curso', 'serie'=>'3', 'ano_letivo'=>'2026'];
+        $this->actingAs($admin)->post(route('admin.importar'), $dados + ['arquivo'=>$this->csv($this->row().$this->row('11111111111'))])->assertSessionHasErrors('arquivo');
+        $this->assertSame(0, Turma::count());
+        $this->assertSame(0, EstagioAluno::count());
+    }
+    public function test_professor_nao_pode_importar_para_turma_de_outro(): void
+    {
+        $professor = User::factory()->create(['is_professor'=>true, 'ativo'=>true]);
+        $turma = Turma::create(['nome'=>'3 A', 'curso'=>'Curso', 'ano_letivo'=>'2026']);
+        $this->actingAs($professor)->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>$this->csv($this->row())])->assertForbidden();
+    }
+}
