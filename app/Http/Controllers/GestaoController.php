@@ -126,7 +126,7 @@ class GestaoController extends Controller
         }
         unset($dados['cpf']);
         $dados += ['turma'=>$turma->nome, 'curso'=>$turma->curso, 'ano_letivo'=>$turma->ano_letivo];
-        if (! $aluno) $dados += ['escola'=>config('estagio.escola.nome', 'EEEP Monsenhor Luiz Ximenes Freire'), 'concedente'=>'', 'orientador'=>''];
+        if (! $aluno) $dados += ['escola'=>config('estagio.escola.nome', 'EEEP Monsenhor Luis Ximenes Freire'), 'concedente'=>'', 'orientador'=>''];
         ($aluno ?? new EstagioAluno())->fill($dados)->save();
         return redirect()->route('admin.index')->with('ok', 'Aluno salvo.');
     }
