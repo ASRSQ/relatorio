@@ -39,7 +39,7 @@ class ImportarAlunos
                 throw ValidationException::withMessages(['arquivo' => 'CSV vazio.']);
             }
             $header = array_map(fn ($v) => trim(preg_replace('/^\xEF\xBB\xBF/', '', $v ?? '')), $header);
-            $required = ['cpf', 'nascimento', 'nome', 'escola', 'curso', 'ano_letivo', 'inicio', 'termino', 'carga_horaria', 'orientador'];
+            $required = ['cpf', 'nascimento', 'nome', 'escola', 'curso', 'ano_letivo', 'inicio', 'termino', 'carga_horaria'];
             if (array_diff($required, $header) || count(array_unique($header)) !== count($header)) {
                 throw ValidationException::withMessages(['arquivo' => 'Cabeçalho inválido. Consulte as colunas no manual.']);
             }
@@ -105,7 +105,8 @@ class ImportarAlunos
                         }
                         $row[$field] = $date->format('Y-m-d');
                     }
-                    $rules = array_fill_keys(['nome', 'escola', 'curso', 'orientador'], 'required|string|max:255');
+                    $rules = array_fill_keys(['nome', 'escola', 'curso'], 'required|string|max:255');
+                    if (! empty($row['orientador'])) $rules['orientador'] = 'string|max:255';
                     if (array_key_exists('concedente', $row) && $row['concedente'] !== '') $rules['concedente'] = 'string|max:255';
                     $rules += ['nascimento' => 'required|date|before:today', 'inicio' => 'nullable|date', 'termino' => 'nullable|date|after_or_equal:inicio', 'ano_letivo' => 'required|string|max:10', 'carga_horaria' => 'required|integer|min:1|max:65535', 'turma' => 'nullable|string|max:100'];
                     $validator = Validator::make($row, $rules);
@@ -136,6 +137,7 @@ class ImportarAlunos
                         $aluno->fill($dados)->save(); $atualizados++;
                     } else {
                         $dados['concedente'] ??= '';
+                        $dados['orientador'] ??= '';
                         EstagioAluno::create(['cpf_hash' => $hash] + $dados); $importados++;
                     }
                     $count++;

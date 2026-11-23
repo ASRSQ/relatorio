@@ -76,6 +76,21 @@ class ImportacaoTurmasTest extends TestCase
         $this->assertSame(0, EstagioAluno::count());
     }
 
+    public function test_importacao_sem_orientador_preserva_valor_e_permite_vinculo_posterior(): void
+    {
+        $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
+        $turma = Turma::create(['nome'=>'A', 'escola'=>'Escola', 'curso'=>'Curso', 'ano_letivo'=>'2026']);
+        $arquivo = "cpf;nascimento;nome;escola;curso;ano_letivo;inicio;termino;carga_horaria\n52998224725;10/02/2007;Aluno;Escola;Curso;2026;;;300\n";
+        $this->actingAs($admin)->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>UploadedFile::fake()->createWithContent('alunos.csv', $arquivo)])->assertSessionHasNoErrors();
+        $aluno = EstagioAluno::firstOrFail();
+        $this->assertSame('', $aluno->orientador);
+        $aluno->update(['orientador'=>'Professor existente']);
+        $this->post(route('admin.importar'), ['turma_id'=>$turma->id, 'arquivo'=>UploadedFile::fake()->createWithContent('alunos.csv', $arquivo)])->assertSessionHasNoErrors();
+        $this->assertSame('Professor existente', $aluno->fresh()->orientador);
+        $this->post(route('admin.professores.salvar'), ['name'=>'Orientador','email'=>'orientador@example.com','password'=>'senha-segura','ativo'=>1,'turmas'=>[$turma->id]])->assertSessionHasNoErrors();
+        $this->assertTrue($turma->professores()->where('email', 'orientador@example.com')->exists());
+    }
+
     public function test_turma_sem_escola_nao_aceita_importacao(): void
     {
         $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
