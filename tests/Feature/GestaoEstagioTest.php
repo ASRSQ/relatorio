@@ -27,21 +27,22 @@ class GestaoEstagioTest extends TestCase
         $this->post('/admin/alunos/'.$outro->id.'/concedente', [])->assertForbidden();
     }
 
-    public function test_student_request_requires_authorized_approval_and_cannot_be_decided_twice(): void
+    public function test_student_copies_and_edits_private_company_without_changing_general_record(): void
     {
-        $turma = Turma::create(['nome'=>'A','curso'=>'Informática','ano_letivo'=>'2026']);
+        $turma = Turma::create(['nome'=>'A','curso'=>'Inform?tica','ano_letivo'=>'2026']);
         $aluno = $this->aluno($turma, str_repeat('a',64));
-        $empresa = Concedente::create(['nome'=>'Empresa aprovada']);
-        $this->withSession(['estagio_aluno_id'=>$aluno->id])->post('/minha-concedente', ['concedente_id'=>$empresa->id])->assertRedirect();
-        $this->assertNull($aluno->fresh()->concedente_id);
-        $pedido = SolicitacaoConcedente::firstOrFail();
-        $professor = User::factory()->create(['is_professor'=>true]);
-        $this->actingAs($professor)->post('/admin/pendencias/'.$pedido->id, ['decisao'=>'aprovada'])->assertForbidden();
-        $professor->turmas()->attach($turma);
-        $this->post('/admin/pendencias/'.$pedido->id, ['decisao'=>'aprovada'])->assertRedirect();
-        $this->assertSame($empresa->id, $aluno->fresh()->concedente_id);
-        $this->assertSame($professor->id, $pedido->fresh()->decidido_por);
-        $this->postJson('/admin/pendencias/'.$pedido->id, ['decisao'=>'aprovada'])->assertUnprocessable();
+        $outro = $this->aluno($turma, str_repeat('b',64));
+        $geral = Concedente::create(['nome'=>'Empresa geral', 'documento'=>'11222333000181']);
+        $this->withSession(['estagio_aluno_id'=>$aluno->id])->post('/minha-concedente', ['concedente_id'=>$geral->id])->assertRedirect();
+        $copia = $aluno->fresh()->empresa;
+        $this->assertNotSame($geral->id, $copia->id);
+        $this->assertSame($aluno->id, $copia->aluno_proprietario_id);
+        $this->assertSame($geral->documento, $copia->documento);
+        $this->post('/minha-concedente', ['nome'=>'Minha empresa', 'documento'=>'11222333000181'])->assertRedirect();
+        $this->assertSame('Minha empresa', $copia->fresh()->nome);
+        $this->assertSame('Empresa geral', $geral->fresh()->nome);
+        $this->withSession(['estagio_aluno_id'=>$outro->id])->postJson('/minha-concedente', ['concedente_id'=>$copia->id])->assertUnprocessable();
+        $this->assertDatabaseCount('solicitacoes_concedente', 0);
     }
 
     public function test_finalized_snapshot_is_not_changed_by_shared_company_update(): void
@@ -79,8 +80,9 @@ class GestaoEstagioTest extends TestCase
         auth()->logout();
         $this->withSession(['estagio_aluno_id'=>$aluno->id])->get('/minha-concedente')->assertOk();
         $this->post('/minha-concedente', ['nome'=>'Outra empresa','cidade'=>'Cidade'])->assertRedirect();
-        $this->assertDatabaseMissing('concedentes', ['nome'=>'Outra empresa']);
-        $this->assertDatabaseHas('solicitacoes_concedente', ['aluno_id'=>$aluno->id,'situacao'=>'pendente']);
-        $this->postJson('/minha-concedente', ['concedente_id'=>Concedente::first()->id])->assertUnprocessable();
+        $empresa = Concedente::where('nome', 'Outra empresa')->firstOrFail();
+        $this->assertSame($aluno->id, $empresa->aluno_proprietario_id);
+        $this->assertSame($empresa->id, $aluno->fresh()->concedente_id);
+        $this->assertDatabaseCount('solicitacoes_concedente', 0);
     }
 }

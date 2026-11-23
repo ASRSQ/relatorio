@@ -75,7 +75,7 @@ class AdminController extends Controller
             'Não iniciados' => (clone $base)->whereDoesntHave('relatorio')->count(),
             'Em preenchimento' => (clone $base)->whereHas('relatorio', fn ($q) => $q->whereNull('concluido_em'))->count(),
             'Finalizados' => (clone $base)->whereHas('relatorio', fn ($q) => $q->whereNotNull('concluido_em'))->count(),
-            'Concedentes cadastradas' => \App\Models\Concedente::count(),
+            'Concedentes cadastradas' => \App\Models\Concedente::whereNull('aluno_proprietario_id')->count(),
             'Pendências' => \App\Models\SolicitacaoConcedente::where('situacao', 'pendente')->whereHas('aluno', fn ($q) => $q->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id'))))->count(),
         ];
         $turmas = $usuario->is_admin ? \App\Models\Turma::orderBy('nome')->get() : $usuario->turmas()->orderBy('nome')->get();

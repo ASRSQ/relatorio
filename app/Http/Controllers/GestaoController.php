@@ -18,20 +18,20 @@ class GestaoController extends Controller
         abort_unless($aluno && $aluno->ativo, 403);
         return $aluno;
     }
-    private function dadosEmpresa(Request $request, ?Concedente $empresa = null): array
+    private function dadosEmpresa(Request $request, ?Concedente $empresa = null, bool $pessoal = false): array
     {
         $request->merge(['documento' => preg_replace('/\D/', '', $request->input('documento', '')) ?: null]);
         $dados = $request->validate([
             'nome' => 'required|string|max:255', 'nome_fantasia' => 'nullable|string|max:255',
-            'documento' => ['nullable', 'regex:/^(\d{11}|\d{14})$/', Rule::unique('concedentes', 'documento')->ignore($empresa?->id)],
+            'documento' => ['nullable', 'regex:/^(\d{11}|\d{14})$/', $pessoal ? 'nullable' : Rule::unique('concedentes', 'documento')->whereNull('aluno_proprietario_id')->ignore($empresa?->id)],
             'endereco' => 'nullable|string|max:255', 'numero' => 'nullable|string|max:30', 'bairro' => 'nullable|string|max:255',
             'cidade' => 'nullable|string|max:255', 'estado' => 'nullable|alpha|size:2', 'telefone' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:255', 'responsavel' => 'nullable|string|max:255',
         ]);
         $documento = $dados['documento'] ?? null;
         if ($documento && ! $this->documentoValido($documento)) throw ValidationException::withMessages(['documento'=>'Informe um CPF ou CNPJ válido.']);
-        if (! $empresa && empty($dados['documento']) && ! $request->boolean('confirmar_semelhante')) {
-            $semelhante = Concedente::whereRaw('LOWER(nome) = ?', [mb_strtolower($dados['nome'])])
+        if (! $pessoal && ! $empresa && empty($dados['documento']) && ! $request->boolean('confirmar_semelhante')) {
+            $semelhante = Concedente::whereNull('aluno_proprietario_id')->whereRaw('LOWER(nome) = ?', [mb_strtolower($dados['nome'])])
                 ->when(! empty($dados['cidade']), fn ($q) => $q->whereRaw('LOWER(cidade) = ?', [mb_strtolower($dados['cidade'])]))->exists();
             if ($semelhante) throw ValidationException::withMessages(['nome'=>'Existe uma concedente com identificação semelhante. Pesquise antes de cadastrar; se for outra empresa, marque a confirmação.']);
         }
@@ -89,18 +89,19 @@ class GestaoController extends Controller
     {
         $busca = $request->validate(['busca'=>'nullable|string|max:255'])['busca'] ?? '';
         $usuario = Auth::user();
-        $empresas = Concedente::with(['alunos' => fn ($q) => $q->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id')))->with('turmaVinculada')])->when($busca, fn ($q) => $q->where(fn ($q) => $q->where('nome','like',"%{$busca}%")->orWhere('documento','like',"%{$busca}%")))->orderBy('nome')->get();
+        $empresas = Concedente::whereNull('aluno_proprietario_id')->with(['alunos' => fn ($q) => $q->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id')))->with('turmaVinculada')])->when($busca, fn ($q) => $q->where(fn ($q) => $q->where('nome','like',"%{$busca}%")->orWhere('documento','like',"%{$busca}%")))->orderBy('nome')->get();
         return view('gestao.empresas', compact('empresas'));
     }
     public function salvarEmpresa(Request $request, ?Concedente $empresa = null)
     {
+        if ($empresa) abort_unless($empresa->aluno_proprietario_id === null, 404);
         $dados = $this->dadosEmpresa($request, $empresa); $dados['ativa'] = $request->boolean('ativa');
         ($empresa ?? new Concedente())->fill($dados)->save(); return back()->with('ok', 'Concedente salva.');
     }
     public function vincular(Request $request, EstagioAluno $aluno)
     {
         abort_unless(Auth::user()->podeVerAluno($aluno), 403);
-        $dados = $request->validate(['concedente_id'=>['required',Rule::exists('concedentes','id')->where('ativa', true)]]);
+        $dados = $request->validate(['concedente_id'=>['required',Rule::exists('concedentes','id')->where('ativa', true)->whereNull('aluno_proprietario_id')]]);
         $aluno->update($dados); return back()->with('ok', 'Concedente vinculada ao aluno.');
     }
     public function alunoForm(?EstagioAluno $aluno = null)
@@ -132,29 +133,28 @@ class GestaoController extends Controller
     }
     public function minhaEmpresa(Request $request)
     {
-        $aluno = $this->alunoProprio($request); $busca = $request->validate(['busca'=>'nullable|string|max:255'])['busca'] ?? '';
-        $empresas = Concedente::where('ativa', true)->when($busca, fn ($q) => $q->where(fn ($q) => $q->where('nome','like',"%{$busca}%")->orWhere('documento','like',"%{$busca}%")))->orderBy('nome')->limit(100)->get();
-        return view('estagio-minha-concedente', ['aluno'=>$aluno, 'empresas'=>$empresas, 'solicitacoes'=>$aluno->solicitacoes()->latest()->get()]);
+        $aluno = $this->alunoProprio($request);
+        $busca = $request->validate(['busca'=>'nullable|string|max:255'])['busca'] ?? '';
+        $empresas = Concedente::whereNull('aluno_proprietario_id')->where('ativa', true)->when($busca, fn ($q) => $q->where(fn ($q) => $q->where('nome', 'like', "%{$busca}%")->orWhere('documento', 'like', "%{$busca}%")))->orderBy('nome')->limit(100)->get();
+        return view('estagio-minha-concedente', ['aluno'=>$aluno, 'empresas'=>$empresas]);
     }
     public function solicitar(Request $request)
     {
         $aluno = $this->alunoProprio($request);
-        if ($request->filled('alterar_id')) {
-            $empresa = Concedente::whereKey($request->integer('alterar_id'))->whereKey($aluno->concedente_id)->where('ativa', true)->firstOrFail();
-            $dados = $this->dadosEmpresa($request, $empresa);
-            $solicitacao = ['concedente_id' => $empresa->id, 'dados' => $dados];
-        } elseif ($request->filled('concedente_id')) {
-            $solicitacao = $request->validate(['concedente_id'=>['required',Rule::exists('concedentes','id')->where('ativa', true)]]);
+        if ($request->filled('concedente_id')) {
+            $dados = $request->validate(['concedente_id'=>['required', Rule::exists('concedentes', 'id')->where('ativa', true)->whereNull('aluno_proprietario_id')]]);
+            $origem = Concedente::whereKey($dados['concedente_id'])->whereNull('aluno_proprietario_id')->where('ativa', true)->firstOrFail();
+            $dados = $origem->only(['nome', 'nome_fantasia', 'documento', 'endereco', 'numero', 'bairro', 'cidade', 'estado', 'telefone', 'email', 'responsavel']);
         } else {
-            $dados = $this->dadosEmpresa($request);
-            $solicitacao = ['dados'=>$dados];
+            $dados = $this->dadosEmpresa($request, null, true);
         }
-        DB::transaction(function () use ($aluno, $solicitacao) {
+        DB::transaction(function () use ($aluno, $dados) {
             $aluno = EstagioAluno::whereKey($aluno->id)->lockForUpdate()->firstOrFail();
-            if ($aluno->solicitacoes()->where('situacao', 'pendente')->exists()) throw ValidationException::withMessages(['solicitacao'=>'Você já possui uma solicitação aguardando análise.']);
-            $aluno->solicitacoes()->create($solicitacao);
+            $empresa = Concedente::updateOrCreate(['aluno_proprietario_id'=>$aluno->id], $dados + ['ativa'=>true]);
+            $aluno->update(['concedente_id'=>$empresa->id]);
+            $aluno->solicitacoes()->where('situacao', 'pendente')->update(['situacao'=>'correcao', 'justificativa'=>'Substitu?da pelo cadastro pessoal do aluno.', 'decidido_em'=>now()]);
         });
-        return back()->with('ok', 'Solicitação enviada para análise do professor.');
+        return back()->with('ok', 'Sua concedente foi salva.');
     }
     public function pendencias()
     {
@@ -172,17 +172,17 @@ class GestaoController extends Controller
             if ($solicitacao->situacao !== 'pendente') throw ValidationException::withMessages(['solicitacao'=>'Esta solicitação já foi analisada.']);
             if ($dados['decisao'] === 'aprovada') {
                 if ($solicitacao->concedente_id) {
-                    $empresa = Concedente::whereKey($solicitacao->concedente_id)->where('ativa',true)->lockForUpdate()->first();
+                    $empresa = Concedente::whereKey($solicitacao->concedente_id)->whereNull('aluno_proprietario_id')->where('ativa',true)->lockForUpdate()->first();
                     if (! $empresa) throw ValidationException::withMessages(['concedente'=>'A concedente não está mais ativa.']);
                     if ($solicitacao->dados) {
                         if ($solicitacao->aluno->concedente_id !== $empresa->id) throw ValidationException::withMessages(['concedente'=>'O vínculo foi alterado. Solicite a alteração novamente.']);
                         $doc = $solicitacao->dados['documento'] ?? null;
-                        if ($doc && Concedente::where('documento', $doc)->where('id', '!=', $empresa->id)->exists()) throw ValidationException::withMessages(['documento'=>'Já existe outra concedente com este CPF/CNPJ.']);
+                        if ($doc && Concedente::whereNull('aluno_proprietario_id')->where('documento', $doc)->where('id', '!=', $empresa->id)->exists()) throw ValidationException::withMessages(['documento'=>'Já existe outra concedente com este CPF/CNPJ.']);
                         $empresa->fill($solicitacao->dados)->save();
                     }
                 } else {
                     $doc = $solicitacao->dados['documento'] ?? null;
-                    if ($doc && Concedente::where('documento',$doc)->exists()) throw ValidationException::withMessages(['documento'=>'Já existe uma concedente com este CPF/CNPJ. Solicite vínculo com o cadastro existente.']);
+                    if ($doc && Concedente::whereNull('aluno_proprietario_id')->where('documento',$doc)->exists()) throw ValidationException::withMessages(['documento'=>'Já existe uma concedente com este CPF/CNPJ. Solicite vínculo com o cadastro existente.']);
                     $empresa = Concedente::create($solicitacao->dados);
                 }
                 $solicitacao->aluno()->update(['concedente_id'=>$empresa->id]); $solicitacao->concedente_id = $empresa->id;
