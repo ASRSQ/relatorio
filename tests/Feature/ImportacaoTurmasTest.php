@@ -18,6 +18,16 @@ class ImportacaoTurmasTest extends TestCase
     {
         return "$cpf;10/02/2007;Aluno;Escola;Curso;2026;;;300;Professor\n";
     }
+    public function test_painel_exibe_textos_em_utf8_e_cabecalho_csv(): void
+    {
+        $admin = User::factory()->create(['is_admin'=>true, 'ativo'=>true]);
+        $this->actingAs($admin)->get(route('admin.index'))
+            ->assertOk()->assertSee('Identificação da turma')->assertSee('Série')
+            ->assertSee('ponto e vírgula')
+            ->assertSee('cpf;nascimento;nome;escola;curso;ano_letivo;concedente;inicio;termino;carga_horaria;orientador');
+        $turma = Turma::create(['nome'=>'A','curso'=>'Curso','ano_letivo'=>'2026']);
+        $this->get(route('admin.turmas'))->assertOk()->assertSee('Não informada')->assertSee('Situação');
+    }
     public function test_importacao_cria_reutiliza_e_vincula_professor(): void
     {
         $professor = User::factory()->create(['is_professor'=>true, 'ativo'=>true]);

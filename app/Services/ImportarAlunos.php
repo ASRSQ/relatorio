@@ -98,7 +98,7 @@ class ImportarAlunos
                     $dados = $validator->validated();
                     if ($turmaSelecionada) {
                         foreach (['escola', 'curso', 'ano_letivo'] as $campo) {
-                            if ($turmaSelecionada->$campo && mb_strtolower(trim($dados[$campo])) !== mb_strtolower(trim($turmaSelecionada->$campo))) $fail("O campo $campo n?o corresponde ? turma selecionada.");
+                            if ($turmaSelecionada->$campo && mb_strtolower(trim($dados[$campo])) !== mb_strtolower(trim($turmaSelecionada->$campo))) $fail("O campo $campo não corresponde à turma selecionada.");
                         }
                         $dados['turma'] = $turmaSelecionada->nome;
                         $dados['turma_id'] = $turmaSelecionada->id;
@@ -109,7 +109,7 @@ class ImportarAlunos
                     $hash = hash_hmac('sha256', $cpf, config('app.key'));
                     $aluno = EstagioAluno::where('cpf_hash', $hash)->first();
                     if ($aluno) {
-                        if ($usuario && ! $usuario->is_admin && ! $usuario->podeVerAluno($aluno)) $fail('Um aluno j? cadastrado n?o pertence ?s suas turmas.');
+                        if ($usuario && ! $usuario->is_admin && ! $usuario->podeVerAluno($aluno)) $fail('Um aluno já cadastrado não pertence às suas turmas.');
                         unset($dados['concedente']);
                         $aluno->fill($dados)->save(); $atualizados++;
                     } else {
