@@ -6,4 +6,4 @@
 <form method="post" action="{{route('estagio.entrar')}}">@csrf
 <label for="cpf">CPF</label><input id="cpf" name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required value="{{old('cpf')}}">
 <label for="nascimento">Data de nascimento</label><input id="nascimento" type="date" name="nascimento" required>
-<button type="submit">Entrar no meu relatório</button></form><p style="font-size:.8rem">Os dados são utilizados exclusivamente para identificar seu cadastro escolar.</p></main></body></html>
+<button type="submit">Entrar no meu relatório</button></form><p style="font-size:.8rem">Os dados são utilizados exclusivamente para identificar seu cadastro escolar.</p></main><script src="{{ asset('js/datas.js') }}"></script></body></html>

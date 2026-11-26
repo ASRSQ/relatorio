@@ -32,6 +32,7 @@ Route::middleware(PrivateResponse::class)->group(function () {
             Route::get('/professores', [GestaoController::class, 'professores'])->name('professores');
             Route::post('/professores/{professor?}', [GestaoController::class, 'salvarProfessor'])->name('professores.salvar');
             Route::get('/turmas', [GestaoController::class, 'turmas'])->name('turmas');
+            Route::post('/turmas/{turma}/carga-horaria', [GestaoController::class, 'salvarCargaHoraria'])->name('turmas.carga');
             Route::post('/turmas/{turma}/professores', [GestaoController::class, 'vincularProfessor'])->name('turmas.professores');
             Route::post('/turmas/{turma?}', [GestaoController::class, 'salvarTurma'])->name('turmas.salvar');
             Route::get('/concedentes', [GestaoController::class, 'empresas'])->name('concedentes');

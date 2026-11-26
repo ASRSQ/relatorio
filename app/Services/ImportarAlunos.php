@@ -48,7 +48,7 @@ class ImportarAlunos
                 $turmaSelecionada = null; $criada = false; $importados = 0; $atualizados = 0; $ignorados = 0;
                 if ($opcoes !== null) {
                     if (! empty($opcoes['turma_id'])) {
-                        $turmaSelecionada = \App\Models\Turma::findOrFail($opcoes['turma_id']);
+                        $turmaSelecionada = \App\Models\Turma::whereKey($opcoes['turma_id'])->lockForUpdate()->firstOrFail();
                         if ($usuario && ! $usuario->is_admin && ! $usuario->turmas()->where('turmas.id', $turmaSelecionada->id)->exists()) abort(403);
                     } else {
                         $identidade = array_intersect_key($opcoes, array_flip(['escola', 'curso', 'serie', 'ano_letivo', 'nome']));
@@ -66,6 +66,7 @@ class ImportarAlunos
                         }
                     }
                 }
+                if ($turmaSelecionada) $turmaSelecionada = \App\Models\Turma::whereKey($turmaSelecionada->id)->lockForUpdate()->firstOrFail();
                 $count = 0;
                 $line = 1;
                 $seen = [];
@@ -125,9 +126,12 @@ class ImportarAlunos
                         }
                         $dados['turma'] = $turmaSelecionada->nome;
                         $dados['turma_id'] = $turmaSelecionada->id;
+                        $dados['carga_horaria'] = $turmaSelecionada->carga_horaria;
                     } elseif (! empty($dados['turma'])) {
                         $turma = \App\Models\Turma::firstOrCreate(['nome'=>$dados['turma'], 'curso'=>$dados['curso'], 'ano_letivo'=>$dados['ano_letivo']]);
+                        $turma = \App\Models\Turma::whereKey($turma->id)->lockForUpdate()->firstOrFail();
                         $dados['turma_id'] = $turma->id;
+                        $dados['carga_horaria'] = $turma->carga_horaria;
                     }
                     $hash = hash_hmac('sha256', $cpf, config('app.key'));
                     $aluno = EstagioAluno::where('cpf_hash', $hash)->first();

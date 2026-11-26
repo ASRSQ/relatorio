@@ -78,6 +78,32 @@ class GestaoController extends Controller
         if ($dados['identidade_hash'] && Turma::where('identidade_hash', $dados['identidade_hash'])->when($turma, fn ($q) => $q->where('id', '!=', $turma->id))->exists()) throw ValidationException::withMessages(['nome'=>'Já existe uma turma com esta identificação.']);
         ($turma ?? new Turma())->fill($dados)->save(); return back()->with('ok', 'Turma salva.');
     }
+    public function salvarCargaHoraria(Request $request, Turma $turma)
+    {
+        abort_unless(Auth::user()->is_admin || Auth::user()->turmas()->where('turmas.id', $turma->id)->exists(), 403);
+        $dados = $request->validate([
+            'carga_horaria' => 'required|integer|min:1|max:65535',
+            'carga_anterior' => 'required|integer|min:1|max:65535',
+            'alunos_confirmados' => 'required|integer|min:0',
+        ]);
+        DB::transaction(function () use ($turma, $dados) {
+            $turma = Turma::whereKey($turma->id)->lockForUpdate()->firstOrFail();
+            abort_unless(Auth::user()->is_admin || Auth::user()->turmas()->where('turmas.id', $turma->id)->exists(), 403);
+            $quantidade = $turma->alunos()->count();
+            if ((int) $turma->carga_horaria !== (int) $dados['carga_anterior'] || $quantidade !== (int) $dados['alunos_confirmados']) {
+                throw ValidationException::withMessages(['carga_horaria' => 'A carga hor?ria ou o n?mero de alunos mudou. Confira os dados atualizados e confirme novamente.']);
+            }
+            if ((int) $turma->carga_horaria === (int) $dados['carga_horaria']) return;
+            DB::table('historico_carga_horaria')->insert([
+                'turma_id' => $turma->id, 'user_id' => Auth::id(),
+                'carga_anterior' => $turma->carga_horaria, 'carga_nova' => $dados['carga_horaria'],
+                'alunos_afetados' => $quantidade, 'created_at' => now(),
+            ]);
+            $turma->update(['carga_horaria' => $dados['carga_horaria']]);
+            $turma->alunos()->update(['carga_horaria' => $dados['carga_horaria']]);
+        });
+        return back()->with('ok', 'Carga hor?ria da turma atualizada.');
+    }
     public function vincularProfessor(Request $request, Turma $turma)
     {
         $this->admin();
@@ -128,7 +154,11 @@ class GestaoController extends Controller
         unset($dados['cpf']);
         $dados += ['turma'=>$turma->nome, 'curso'=>$turma->curso, 'ano_letivo'=>$turma->ano_letivo];
         if (! $aluno) $dados += ['escola'=>config('estagio.escola.nome', 'EEEP Monsenhor Luis Ximenes Freire'), 'concedente'=>'', 'orientador'=>''];
-        ($aluno ?? new EstagioAluno())->fill($dados)->save();
+        DB::transaction(function () use ($dados, $aluno) {
+            $turma = Turma::whereKey($dados['turma_id'])->lockForUpdate()->firstOrFail();
+            $dados['carga_horaria'] = $turma->carga_horaria;
+            ($aluno ?? new EstagioAluno())->fill($dados)->save();
+        });
         return redirect()->route('admin.index')->with('ok', 'Aluno salvo.');
     }
     public function minhaEmpresa(Request $request)
@@ -152,7 +182,7 @@ class GestaoController extends Controller
             $aluno = EstagioAluno::whereKey($aluno->id)->lockForUpdate()->firstOrFail();
             $empresa = Concedente::updateOrCreate(['aluno_proprietario_id'=>$aluno->id], $dados + ['ativa'=>true]);
             $aluno->update(['concedente_id'=>$empresa->id]);
-            $aluno->solicitacoes()->where('situacao', 'pendente')->update(['situacao'=>'correcao', 'justificativa'=>'Substitu?da pelo cadastro pessoal do aluno.', 'decidido_em'=>now()]);
+            $aluno->solicitacoes()->where('situacao', 'pendente')->update(['situacao'=>'correcao', 'justificativa'=>'Substituída pelo cadastro pessoal do aluno.', 'decidido_em'=>now()]);
         });
         return back()->with('ok', 'Sua concedente foi salva.');
     }

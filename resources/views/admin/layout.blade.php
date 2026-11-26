@@ -3,4 +3,4 @@
 </style></head><body><header><div><strong>EEEP Monsenhor Luis Ximenes Freire</strong><div>Relatórios de Estágio Supervisionado</div></div>@auth @if(auth()->user()->is_admin || auth()->user()->is_professor)<nav><a href="{{route('admin.index')}}">Painel</a> · <a href="{{route('admin.turmas')}}">Turmas</a> · <a href="{{route('admin.concedentes')}}">Concedentes</a> · <a href="{{route('admin.pendencias')}}">Pendências</a> @if(auth()->user()->is_admin) · <a href="{{route('admin.professores')}}">Professores</a>@endif</nav><form method="post" action="{{route('admin.sair')}}">@csrf<button>Sair</button></form>@endif @endauth</header><main>
 @if(session('ok'))<p role="status" class="alert">{{session('ok')}}</p>@endif
 @if($errors->any())<div role="alert" class="error">@foreach($errors->all() as $erro)<p>{{$erro}}</p>@endforeach</div>@endif
-@yield('content')</main></body></html>
+@yield('content')</main><script src="{{ asset('js/datas.js') }}"></script></body></html>

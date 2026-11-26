@@ -29,7 +29,7 @@ class GestaoEstagioTest extends TestCase
 
     public function test_student_copies_and_edits_private_company_without_changing_general_record(): void
     {
-        $turma = Turma::create(['nome'=>'A','curso'=>'Inform?tica','ano_letivo'=>'2026']);
+        $turma = Turma::create(['nome'=>'A','curso'=>'Informática','ano_letivo'=>'2026']);
         $aluno = $this->aluno($turma, str_repeat('a',64));
         $outro = $this->aluno($turma, str_repeat('b',64));
         $geral = Concedente::create(['nome'=>'Empresa geral', 'documento'=>'11222333000181']);
