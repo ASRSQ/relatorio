@@ -91,7 +91,7 @@ class GestaoController extends Controller
             abort_unless(Auth::user()->is_admin || Auth::user()->turmas()->where('turmas.id', $turma->id)->exists(), 403);
             $quantidade = $turma->alunos()->count();
             if ((int) $turma->carga_horaria !== (int) $dados['carga_anterior'] || $quantidade !== (int) $dados['alunos_confirmados']) {
-                throw ValidationException::withMessages(['carga_horaria' => 'A carga hor?ria ou o n?mero de alunos mudou. Confira os dados atualizados e confirme novamente.']);
+                throw ValidationException::withMessages(['carga_horaria' => 'A carga horária ou o número de alunos mudou. Confira os dados atualizados e confirme novamente.']);
             }
             if ((int) $turma->carga_horaria === (int) $dados['carga_horaria']) return;
             DB::table('historico_carga_horaria')->insert([
@@ -102,7 +102,7 @@ class GestaoController extends Controller
             $turma->update(['carga_horaria' => $dados['carga_horaria']]);
             $turma->alunos()->update(['carga_horaria' => $dados['carga_horaria']]);
         });
-        return back()->with('ok', 'Carga hor?ria da turma atualizada.');
+        return back()->with('ok', 'Carga horária da turma atualizada.');
     }
     public function vincularProfessor(Request $request, Turma $turma)
     {

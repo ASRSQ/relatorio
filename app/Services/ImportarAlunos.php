@@ -13,7 +13,7 @@ class ImportarAlunos
     private function normalizarEscola(string $nome): string
     {
         $nome = mb_strtolower($nome, 'UTF-8');
-        // Apenas variantes acentuadas latinas comuns; n?o usa compara??o aproximada.
+        // Apenas variantes acentuadas latinas comuns; não usa comparação aproximada.
         $nome = strtr($nome, [
             'á'=>'a', 'à'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a',
             'é'=>'e', 'è'=>'e', 'ê'=>'e', 'ë'=>'e',
@@ -118,7 +118,7 @@ class ImportarAlunos
                     if ($turmaSelecionada) {
                         $escolaTurma = $turmaSelecionada->escola;
                         if (! $escolaTurma || $this->normalizarEscola($dados['escola']) !== $this->normalizarEscola($escolaTurma)) {
-                            $cadastrada = $escolaTurma ?: 'n?o informada';
+                            $cadastrada = $escolaTurma ?: 'não informada';
                             $fail("Escola cadastrada na turma: {$cadastrada}. Escola identificada no CSV: {$dados['escola']}.");
                         }
                         foreach (['curso', 'ano_letivo'] as $campo) {
