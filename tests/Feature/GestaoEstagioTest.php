@@ -10,6 +10,23 @@ class GestaoEstagioTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_teacher_can_assign_an_active_general_company_from_dashboard(): void
+    {
+        $turma = Turma::create(['nome' => 'A', 'curso' => 'Informática', 'ano_letivo' => '2026']);
+        $aluno = $this->aluno($turma, str_repeat('a', 64));
+        $professor = User::factory()->create(['is_professor' => true]);
+        $professor->turmas()->attach($turma);
+        $empresa = Concedente::create(['nome' => 'Empresa disponível', 'ativa' => true]);
+        $inativa = Concedente::create(['nome' => 'Empresa inativa', 'ativa' => false]);
+
+        $this->actingAs($professor)->get('/admin')->assertOk()
+            ->assertSee('Selecionar concedente para '.$aluno->nome)->assertSee('Empresa disponível')->assertDontSee('Empresa inativa');
+        $this->from('/admin?busca=Aluno')->post('/admin/alunos/'.$aluno->id.'/concedente', ['concedente_id' => $empresa->id])
+            ->assertRedirect('/admin?busca=Aluno')->assertSessionHasNoErrors();
+        $this->assertSame($empresa->id, $aluno->fresh()->concedente_id);
+        $this->post('/admin/alunos/'.$aluno->id.'/concedente', ['concedente_id' => $inativa->id])->assertSessionHasErrors('concedente_id');
+    }
+
     public function test_validation_messages_explain_company_and_import_errors(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

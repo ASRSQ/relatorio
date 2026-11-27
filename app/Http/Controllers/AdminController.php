@@ -50,7 +50,7 @@ class AdminController extends Controller
         $data = $request->validate(['busca' => 'nullable|string|max:100', 'status' => 'nullable|in:nao_iniciado,iniciado,preenchendo,concluido']);
         $usuario = Auth::user();
         $base = EstagioAluno::query()->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id')));
-        $query = (clone $base)->with('relatorio')->orderBy('nome');
+        $query = (clone $base)->with(['relatorio', 'empresa'])->orderBy('nome');
         if ($request->filled('turma_id')) $query->where('turma_id', $request->integer('turma_id'));
         if ($search = $data['busca'] ?? null) {
             $query->where(fn ($q) => $q->where('nome', 'like', "%$search%")->orWhere('turma', 'like', "%$search%"));
@@ -79,8 +79,9 @@ class AdminController extends Controller
             'Pendências' => \App\Models\SolicitacaoConcedente::where('situacao', 'pendente')->whereHas('aluno', fn ($q) => $q->when(! $usuario->is_admin, fn ($q) => $q->whereIn('turma_id', $usuario->turmas()->select('turmas.id'))))->count(),
         ];
         $turmas = $usuario->is_admin ? \App\Models\Turma::orderBy('nome')->get() : $usuario->turmas()->orderBy('nome')->get();
+        $empresas = \App\Models\Concedente::whereNull('aluno_proprietario_id')->where('ativa', true)->orderBy('nome')->get();
 
-        return view('admin.index', compact('alunos', 'totais', 'turmas'));
+        return view('admin.index', compact('alunos', 'totais', 'turmas', 'empresas'));
     }
 
     public function importar(Request $request, ImportarAlunos $importador)
