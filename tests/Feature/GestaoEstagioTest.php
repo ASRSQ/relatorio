@@ -10,6 +10,30 @@ class GestaoEstagioTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_company_deletion_preserves_linked_students_and_requests(): void
+    {
+        $turma = Turma::create(['nome' => 'A', 'curso' => 'Informática', 'ano_letivo' => '2026']);
+        $aluno = $this->aluno($turma, str_repeat('a', 64));
+        $professor = User::factory()->create(['is_professor' => true]);
+        $professor->turmas()->attach($turma);
+        $livre = Concedente::create(['nome' => 'Livre']);
+        $vinculada = Concedente::create(['nome' => 'Vinculada']);
+        $solicitada = Concedente::create(['nome' => 'Solicitada']);
+        $aluno->update(['concedente_id' => $vinculada->id]);
+        SolicitacaoConcedente::create(['aluno_id' => $aluno->id, 'concedente_id' => $solicitada->id, 'situacao' => 'pendente']);
+
+        $this->actingAs($professor)->delete('/admin/concedentes/'.$livre->id)->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('concedentes', ['id' => $livre->id]);
+        foreach ([$vinculada, $solicitada] as $empresa) {
+            $this->delete('/admin/concedentes/'.$empresa->id)->assertSessionHasErrors('concedente');
+            $this->assertDatabaseHas('concedentes', ['id' => $empresa->id]);
+        }
+        $this->assertSame($vinculada->id, $aluno->fresh()->concedente_id);
+        $pessoal = Concedente::create(['nome' => 'Pessoal', 'aluno_proprietario_id' => $aluno->id]);
+        $this->delete('/admin/concedentes/'.$pessoal->id)->assertNotFound();
+        $this->assertDatabaseHas('concedentes', ['id' => $pessoal->id]);
+    }
+
     public function test_teacher_can_assign_an_active_general_company_from_dashboard(): void
     {
         $turma = Turma::create(['nome' => 'A', 'curso' => 'Informática', 'ano_letivo' => '2026']);

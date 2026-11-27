@@ -124,11 +124,28 @@ class GestaoController extends Controller
         $dados = $this->dadosEmpresa($request, $empresa); $dados['ativa'] = $request->boolean('ativa');
         ($empresa ?? new Concedente())->fill($dados)->save(); return back()->with('ok', 'Concedente salva.');
     }
+    public function excluirEmpresa(Concedente $empresa)
+    {
+        DB::transaction(function () use ($empresa) {
+            $empresa = Concedente::whereKey($empresa->id)->whereNull('aluno_proprietario_id')->lockForUpdate()->firstOrFail();
+            if ($empresa->alunos()->exists() || SolicitacaoConcedente::where('concedente_id', $empresa->id)->exists()) {
+                throw ValidationException::withMessages(['concedente' => 'Esta concedente está vinculada a alunos ou solicitações e não pode ser excluída. Você pode desativá-la na edição.']);
+            }
+            $empresa->delete();
+        });
+
+        return back()->with('ok', 'Concedente excluída com sucesso.');
+    }
     public function vincular(Request $request, EstagioAluno $aluno)
     {
         abort_unless(Auth::user()->podeVerAluno($aluno), 403);
         $dados = $request->validate(['concedente_id'=>['required',Rule::exists('concedentes','id')->where('ativa', true)->whereNull('aluno_proprietario_id')]]);
-        $aluno->update($dados); return back()->with('ok', 'Concedente vinculada ao aluno.');
+        DB::transaction(function () use ($aluno, $dados) {
+            $empresa = Concedente::whereKey($dados['concedente_id'])->whereNull('aluno_proprietario_id')->where('ativa', true)->lockForUpdate()->first();
+            if (! $empresa) throw ValidationException::withMessages(['concedente_id' => 'A concedente não está mais disponível. Atualize a página e escolha novamente.']);
+            $aluno->update(['concedente_id' => $empresa->id]);
+        });
+        return back()->with('ok', 'Concedente vinculada ao aluno.');
     }
     public function alunoForm(?EstagioAluno $aluno = null)
     {

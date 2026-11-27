@@ -37,6 +37,7 @@ Route::middleware(PrivateResponse::class)->group(function () {
             Route::post('/turmas/{turma?}', [GestaoController::class, 'salvarTurma'])->name('turmas.salvar');
             Route::get('/concedentes', [GestaoController::class, 'empresas'])->name('concedentes');
             Route::post('/concedentes/{empresa?}', [GestaoController::class, 'salvarEmpresa'])->name('concedentes.salvar');
+            Route::delete('/concedentes/{empresa}', [GestaoController::class, 'excluirEmpresa'])->name('concedentes.excluir');
             Route::get('/pendencias', [GestaoController::class, 'pendencias'])->name('pendencias');
             Route::post('/pendencias/{solicitacao}', [GestaoController::class, 'decidir'])->name('pendencias.decidir');
         });
