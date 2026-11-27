@@ -7,6 +7,12 @@ return [
     'numeric' => 'O campo :attribute deve ser um número.',
     'boolean' => 'O campo :attribute deve ser verdadeiro ou falso.',
     'email' => 'Informe um e-mail válido no campo :attribute.',
+    'regex' => 'O formato do campo :attribute é inválido.',
+    'alpha' => 'O campo :attribute deve conter apenas letras.',
+    'array' => 'Selecione opções válidas para :attribute.',
+    'exists' => 'O valor selecionado para :attribute não existe ou não está disponível. Atualize a página e escolha novamente.',
+    'required_without' => 'Informe :attribute quando :values não for selecionada.',
+    'required_unless' => 'O campo :attribute é obrigatório para a opção selecionada.',
     'date' => 'O campo :attribute deve conter uma data válida.',
     'date_format' => 'O campo :attribute deve conter uma data válida no formato :format.',
     'before' => 'O campo :attribute deve ser uma data anterior a :date.',
@@ -29,6 +35,12 @@ return [
         'file' => 'O arquivo :attribute deve ter pelo menos :min KB.',
         'array' => 'O campo :attribute deve ter pelo menos :min itens.',
     ],
+    'size' => [
+        'string' => 'O campo :attribute deve ter exatamente :size caracteres.',
+        'numeric' => 'O campo :attribute deve ser igual a :size.',
+        'file' => 'O arquivo :attribute deve ter :size KB.',
+        'array' => 'O campo :attribute deve conter :size itens.',
+    ],
     'password' => [
         'letters' => 'A senha deve conter pelo menos uma letra.',
         'mixed' => 'A senha deve conter letras maiúsculas e minúsculas.',
@@ -37,6 +49,14 @@ return [
         'uncompromised' => 'Esta senha apareceu em um vazamento de dados. Escolha outra senha.',
     ],
     'custom' => [
+        'documento' => [
+            'regex' => 'Informe um CPF com 11 dígitos ou um CNPJ com 14 dígitos.',
+        ],
+        'estado' => [
+            'alpha' => 'Informe a UF usando apenas duas letras, como CE.',
+            'size' => 'Informe a UF com duas letras, como CE.',
+        ],
+        'justificativa' => ['required_unless' => 'Informe uma justificativa ao rejeitar ou solicitar correção.'],
         'versao' => [
             'required' => 'Não foi possível identificar a versão do relatório. Copie seus textos e recarregue a página.',
             'integer' => 'A versão do relatório é inválida. Copie seus textos e recarregue a página.',
@@ -61,7 +81,7 @@ return [
         'escola_endereco' => 'endereço da escola', 'escola_numero' => 'número do endereço da escola',
         'escola_bairro' => 'bairro da escola', 'escola_cidade' => 'cidade / UF da escola',
         'escola_telefone' => 'telefone da escola', 'escola_email' => 'e-mail da escola',
-        'cpf' => 'CPF', 'nascimento' => 'data de nascimento', 'nome' => 'nome', 'name' => 'nome',
+        'cpf' => 'CPF', 'documento' => 'CPF ou CNPJ', 'nascimento' => 'data de nascimento', 'nome' => 'nome', 'name' => 'nome',
         'email' => 'e-mail', 'password' => 'senha', 'escola' => 'escola', 'curso' => 'curso',
         'turma' => 'turma', 'ano_letivo' => 'ano letivo', 'concedente' => 'concedente',
         'orientador' => 'orientador', 'inicio' => 'data de início do estágio', 'termino' => 'data de término do estágio',
@@ -69,5 +89,12 @@ return [
         'conclusao' => 'conclusão', 'local' => 'município', 'data_relatorio' => 'data do relatório',
         'versao' => 'versão do relatório', 'concluir' => 'conclusão do relatório', 'arquivo' => 'CSV',
         'busca' => 'busca', 'status' => 'situação',
+        'nome_fantasia' => 'nome fantasia', 'endereco' => 'endereço', 'numero' => 'número',
+        'bairro' => 'bairro', 'cidade' => 'cidade', 'estado' => 'UF', 'telefone' => 'telefone',
+        'responsavel' => 'responsável', 'turma_id' => 'turma', 'turmas' => 'turmas', 'turmas.*' => 'turma',
+        'professor_id' => 'professor', 'concedente_id' => 'concedente', 'matricula' => 'matrícula',
+        'ativo' => 'situação', 'ativa' => 'situação', 'turno' => 'turno', 'decisao' => 'decisão',
+        'justificativa' => 'justificativa', 'carga_anterior' => 'carga horária anterior',
+        'alunos_confirmados' => 'número de alunos confirmados',
     ],
 ];

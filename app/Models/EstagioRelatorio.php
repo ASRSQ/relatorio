@@ -63,11 +63,12 @@ class EstagioRelatorio extends Model
             $rules[$campo] = ['required', function ($attribute, $value, $fail) use ($minimo, $maximo) {
                 $normalizado = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $value ?? ''));
                 $faltam = $minimo - mb_strlen($normalizado, 'UTF-8');
+                $nome = ['introducao' => 'introdução', 'atividades' => 'atividades desenvolvidas', 'conclusao' => 'conclusão'][$attribute];
                 if ($faltam > 0) {
-                    $fail("Faltam {$faltam} caracteres para atingir o mínimo de {$minimo} nesta seção.");
+                    $fail("Na seção {$nome}, faltam {$faltam} caracteres para atingir o mínimo de {$minimo}.");
                 }
                 if (mb_strlen(trim($value ?? ''), 'UTF-8') > $maximo) {
-                    $fail("Esta seção ultrapassa o máximo de {$maximo} caracteres. Reduza o texto.");
+                    $fail("A seção {$nome} ultrapassa o máximo de {$maximo} caracteres. Reduza o texto.");
                 }
             }];
         }

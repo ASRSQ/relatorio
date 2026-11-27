@@ -40,8 +40,8 @@ async function save(concluir=false){
             const response=await fetch(form.action,{method:'POST',body:data,headers:{Accept:'application/json'},credentials:'same-origin'});
             if(!response.ok){
                 if(response.status===409)blocked=true;
-                let message=response.status===409?'Outra aba alterou este relatório. Copie seus textos e recarregue a página.':'Não foi possível salvar. Mantenha esta página aberta e tente novamente.';
-                if(response.status===422){const error=await response.json();message=Object.values(error.errors||{}).flat().join(' ');}
+                let message=response.status===409?'Outra aba alterou este relatório. Copie seus textos e recarregue a página.':response.status===419||response.status===401||response.status===403?'Sua sessão pode ter expirado ou seu acesso não está disponível. Copie seus textos e entre novamente.':response.status===429?'Muitas tentativas de salvamento. Aguarde um pouco e tente novamente.':'Não foi possível salvar. Mantenha esta página aberta e tente novamente.';
+                if(response.status===422){const error=await response.json();message=Object.values(error.errors||{}).flat().join(' ')||message;}
                 throw new Error(message);
             }
             const result=await response.json();version.value=result.versao;

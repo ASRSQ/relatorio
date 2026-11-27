@@ -13,6 +13,7 @@ function setup() {
     const form = nodes.get('formRelatorio');
     form.action = '/relatorio';
     form.querySelectorAll = () => fields.map(id => nodes.get(id));
+    form.querySelector = () => null;
     const requests = [];
     const windowListeners = {};
     const context = vm.createContext({

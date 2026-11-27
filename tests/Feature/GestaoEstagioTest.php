@@ -10,6 +10,30 @@ class GestaoEstagioTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_validation_messages_explain_company_and_import_errors(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin)->post('/admin/concedentes', ['nome' => 'Empresa', 'estado' => 'C', 'ativa' => 1])
+            ->assertSessionHasErrors(['estado' => 'Informe a UF com duas letras, como CE.']);
+        $this->post('/admin/cadastro-aluno', ['nome' => 'Aluno', 'cpf' => '123', 'nascimento' => '2008-01-01', 'turma_id' => 999, 'ativo' => 1])
+            ->assertSessionHasErrors(['turma_id' => 'O valor selecionado para turma não existe ou não está disponível. Atualize a página e escolha novamente.']);
+    }
+
+    public function test_company_fields_and_document_validation(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin)->post('/admin/concedentes', [
+            'nome' => 'Empresa completa', 'nome_fantasia' => 'Fantasia', 'documento' => '11.222.333/0001-81',
+            'endereco' => 'Rua Um', 'numero' => '123', 'bairro' => 'Centro', 'cidade' => 'Fortaleza',
+            'estado' => 'CE', 'telefone' => '(85) 99999-9999', 'email' => 'empresa@example.org',
+            'responsavel' => 'Responsável', 'ativa' => 1,
+        ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('concedentes', ['nome' => 'Empresa completa', 'documento' => '11222333000181', 'cidade' => 'Fortaleza']);
+
+        $this->post('/admin/concedentes', ['nome' => 'Outra empresa', 'documento' => '123', 'ativa' => 1])
+            ->assertSessionHasErrors(['documento' => 'Informe um CPF com 11 dígitos ou um CNPJ com 14 dígitos.']);
+    }
+
     private function aluno(Turma $turma, string $hash): EstagioAluno
     {
         return EstagioAluno::create(['nome'=>'Aluno de teste', 'cpf_hash'=>$hash, 'nascimento'=>'2008-01-01', 'escola'=>'Escola', 'curso'=>'Informática', 'ano_letivo'=>'2026', 'concedente'=>'Empresa legada', 'orientador'=>'Professor', 'turma_id'=>$turma->id]);
